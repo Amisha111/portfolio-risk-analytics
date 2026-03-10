@@ -6,11 +6,6 @@
 
 ---
 
-## 🏆 Resume Bullet Point
-
-> *Built portfolio risk analytics dashboard calculating VaR, Sharpe Ratio, and volatility for a 10-asset portfolio using Python (Pandas, NumPy, SciPy) and an interactive HTML5/Chart.js dashboard — covering 1,043 trading days with Historical & Parametric VaR at 95% and 99% confidence levels.*
-
----
 
 ## 📌 Project Overview
 
