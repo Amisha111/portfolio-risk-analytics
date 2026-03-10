@@ -1,0 +1,849 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Portfolio Risk Analytics Dashboard</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;500;600&family=Syne:wght@400;700;800&display=swap" rel="stylesheet"/>
+<style>
+  :root {
+    --bg:       #080c14;
+    --surface:  #0d1420;
+    --card:     #111927;
+    --border:   #1e2d40;
+    --accent:   #00d4ff;
+    --accent2:  #ff6b35;
+    --accent3:  #00ff88;
+    --accent4:  #c084fc;
+    --text:     #e2eaf4;
+    --muted:    #5a7a96;
+    --danger:   #ff4560;
+    --warn:     #ffd700;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 13px;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Scanlines overlay */
+  body::before {
+    content: '';
+    position: fixed; inset: 0;
+    background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,212,255,0.012) 2px, rgba(0,212,255,0.012) 4px);
+    pointer-events: none;
+    z-index: 9999;
+  }
+
+  /* ── Header ─────────────────────────────────────────── */
+  header {
+    padding: 28px 40px 20px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    background: linear-gradient(90deg, rgba(0,212,255,0.04), transparent);
+    position: relative;
+  }
+  header::after {
+    content: '';
+    position: absolute;
+    bottom: -1px; left: 0; right: 0; height: 1px;
+    background: linear-gradient(90deg, var(--accent), transparent 60%);
+  }
+
+  .logo-area h1 {
+    font-family: 'Syne', sans-serif;
+    font-size: 24px;
+    font-weight: 800;
+    letter-spacing: -0.5px;
+    color: #fff;
+  }
+  .logo-area h1 span { color: var(--accent); }
+  .logo-area p {
+    color: var(--muted);
+    font-size: 11px;
+    margin-top: 3px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+  }
+
+  .header-stats {
+    display: flex;
+    gap: 32px;
+  }
+  .h-stat {
+    text-align: right;
+  }
+  .h-stat .val {
+    font-family: 'Syne', sans-serif;
+    font-size: 20px;
+    font-weight: 700;
+  }
+  .h-stat .lbl { color: var(--muted); font-size: 10px; text-transform: uppercase; letter-spacing: 1px; margin-top: 2px; }
+  .positive { color: var(--accent3); }
+  .negative { color: var(--danger); }
+  .neutral  { color: var(--accent); }
+
+  /* ── Live ticker tape ───────────────────────────────── */
+  .ticker-bar {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    overflow: hidden;
+    padding: 6px 0;
+    position: relative;
+  }
+  .ticker-scroll {
+    display: flex;
+    gap: 48px;
+    animation: ticker 40s linear infinite;
+    white-space: nowrap;
+  }
+  .ticker-item { display: inline-flex; gap: 8px; align-items: center; }
+  .ticker-item .sym { color: var(--accent); font-weight: 500; }
+  .ticker-item .chg { font-size: 11px; }
+  @keyframes ticker {
+    0%   { transform: translateX(0); }
+    100% { transform: translateX(-50%); }
+  }
+
+  /* ── Layout ─────────────────────────────────────────── */
+  .main { padding: 28px 40px; }
+
+  /* KPI Row */
+  .kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 14px;
+    margin-bottom: 24px;
+  }
+
+  .kpi {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 18px 20px;
+    position: relative;
+    overflow: hidden;
+    transition: border-color 0.2s;
+  }
+  .kpi::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0; height: 2px;
+  }
+  .kpi.c1::before { background: var(--accent); }
+  .kpi.c2::before { background: var(--accent3); }
+  .kpi.c3::before { background: var(--accent4); }
+  .kpi.c4::before { background: var(--accent2); }
+  .kpi.c5::before { background: var(--warn); }
+
+  .kpi:hover { border-color: var(--accent); }
+  .kpi .kpi-label {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    color: var(--muted);
+    margin-bottom: 10px;
+  }
+  .kpi .kpi-val {
+    font-family: 'Syne', sans-serif;
+    font-size: 26px;
+    font-weight: 700;
+    line-height: 1;
+  }
+  .kpi .kpi-sub {
+    font-size: 10px;
+    color: var(--muted);
+    margin-top: 6px;
+  }
+  .kpi .kpi-icon {
+    position: absolute;
+    top: 16px; right: 16px;
+    font-size: 18px;
+    opacity: 0.3;
+  }
+
+  /* Charts grid */
+  .charts-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+    margin-bottom: 14px;
+  }
+  .charts-row3 {
+    display: grid;
+    grid-template-columns: 1.3fr 1fr 0.7fr;
+    gap: 14px;
+    margin-bottom: 14px;
+  }
+
+  .panel {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 20px;
+    position: relative;
+  }
+  .panel-title {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    color: var(--accent);
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .panel-title::before {
+    content: '';
+    width: 3px; height: 12px;
+    background: var(--accent);
+    border-radius: 2px;
+    display: inline-block;
+  }
+
+  .chart-wrap { position: relative; }
+  .chart-wrap canvas { max-width: 100%; }
+
+  /* Data Table */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+  }
+  thead th {
+    text-align: right;
+    padding: 8px 10px;
+    color: var(--muted);
+    font-size: 10px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    border-bottom: 1px solid var(--border);
+    font-weight: 400;
+  }
+  thead th:first-child { text-align: left; }
+  tbody tr {
+    border-bottom: 1px solid rgba(30,45,64,0.5);
+    transition: background 0.15s;
+    cursor: pointer;
+  }
+  tbody tr:hover { background: rgba(0,212,255,0.04); }
+  tbody td {
+    padding: 9px 10px;
+    text-align: right;
+  }
+  tbody td:first-child { text-align: left; }
+
+  .ticker-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-weight: 600;
+    color: #fff;
+  }
+  .ticker-dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    display: inline-block;
+  }
+
+  .badge {
+    display: inline-block;
+    padding: 2px 7px;
+    border-radius: 3px;
+    font-size: 10px;
+    font-weight: 600;
+  }
+  .badge.good { background: rgba(0,255,136,0.12); color: var(--accent3); }
+  .badge.bad  { background: rgba(255,69,96,0.12);  color: var(--danger); }
+  .badge.ok   { background: rgba(0,212,255,0.10);  color: var(--accent); }
+
+  /* Correlation heatmap */
+  #heatmap-canvas {
+    width: 100%;
+    height: 320px;
+    display: block;
+  }
+
+  /* Footer */
+  footer {
+    padding: 20px 40px;
+    border-top: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    color: var(--muted);
+    font-size: 10px;
+    letter-spacing: 1px;
+  }
+  .status-dot {
+    display: inline-block;
+    width: 6px; height: 6px;
+    background: var(--accent3);
+    border-radius: 50%;
+    margin-right: 6px;
+    animation: pulse 2s ease-in-out infinite;
+  }
+  @keyframes pulse {
+    0%,100% { opacity: 1; }
+    50%      { opacity: 0.3; }
+  }
+
+  /* Tabs */
+  .tabs {
+    display: flex;
+    gap: 2px;
+    margin-bottom: 16px;
+    background: var(--surface);
+    border-radius: 5px;
+    padding: 3px;
+  }
+  .tab {
+    flex: 1;
+    padding: 7px;
+    text-align: center;
+    cursor: pointer;
+    border-radius: 4px;
+    font-size: 10px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: var(--muted);
+    transition: all 0.2s;
+  }
+  .tab.active { background: var(--border); color: var(--accent); }
+  .tab:hover:not(.active) { color: var(--text); }
+
+  /* Weight bars */
+  .weight-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 10px;
+  }
+  .weight-label { width: 45px; font-size: 11px; color: var(--text); }
+  .weight-track {
+    flex: 1;
+    height: 6px;
+    background: var(--border);
+    border-radius: 3px;
+    overflow: hidden;
+  }
+  .weight-fill {
+    height: 100%;
+    border-radius: 3px;
+    transition: width 0.6s ease;
+  }
+  .weight-pct { width: 35px; text-align: right; font-size: 11px; color: var(--muted); }
+</style>
+</head>
+<body>
+
+<!-- ═══════════════════════════ HEADER ══════════════════════════════════ -->
+<header>
+  <div class="logo-area">
+    <h1>RISK<span>LENS</span> Analytics</h1>
+    <p>Multi-Asset Portfolio Risk Dashboard · 2021 – 2024</p>
+  </div>
+  <div class="header-stats">
+    <div class="h-stat">
+      <div class="val positive">+11.28%</div>
+      <div class="lbl">Portfolio Return</div>
+    </div>
+    <div class="h-stat">
+      <div class="val neutral">0.5816</div>
+      <div class="lbl">Sharpe Ratio</div>
+    </div>
+    <div class="h-stat">
+      <div class="val negative">-10.91%</div>
+      <div class="lbl">Max Drawdown</div>
+    </div>
+    <div class="h-stat">
+      <div class="val neutral">10.80%</div>
+      <div class="lbl">Volatility</div>
+    </div>
+  </div>
+</header>
+
+<!-- ═══════════════════════════ TICKER TAPE ══════════════════════════════ -->
+<div class="ticker-bar">
+  <div class="ticker-scroll" id="ticker-scroll"></div>
+</div>
+
+<!-- ═══════════════════════════ MAIN ════════════════════════════════════ -->
+<div class="main">
+
+  <!-- KPIs -->
+  <div class="kpi-grid">
+    <div class="kpi c1">
+      <div class="kpi-label">Portfolio Return (Ann.)</div>
+      <div class="kpi-val positive">11.28%</div>
+      <div class="kpi-sub">Jan 2021 – Dec 2024</div>
+      <span class="kpi-icon">📈</span>
+    </div>
+    <div class="kpi c2">
+      <div class="kpi-label">Sharpe Ratio</div>
+      <div class="kpi-val neutral">0.5816</div>
+      <div class="kpi-sub">Rf = 5.0% · 252-day basis</div>
+      <span class="kpi-icon">⚡</span>
+    </div>
+    <div class="kpi c3">
+      <div class="kpi-label">VaR 95% (Historical)</div>
+      <div class="kpi-val" style="color:var(--warn)">1.04%</div>
+      <div class="kpi-sub">Max daily loss at 95% conf.</div>
+      <span class="kpi-icon">🎯</span>
+    </div>
+    <div class="kpi c4">
+      <div class="kpi-label">VaR 99% (Historical)</div>
+      <div class="kpi-val negative">1.45%</div>
+      <div class="kpi-sub">Parametric: 1.54%</div>
+      <span class="kpi-icon">⚠️</span>
+    </div>
+    <div class="kpi c5">
+      <div class="kpi-label">Max Drawdown</div>
+      <div class="kpi-val negative">-10.91%</div>
+      <div class="kpi-sub">CVaR 95%: 1.28%</div>
+      <span class="kpi-icon">📉</span>
+    </div>
+  </div>
+
+  <!-- Row 1: Return vs Risk scatter + Portfolio Returns histogram -->
+  <div class="charts-grid">
+    <div class="panel">
+      <div class="panel-title">Return vs Risk (Risk-Return Scatter)</div>
+      <div class="chart-wrap"><canvas id="scatterChart" height="200"></canvas></div>
+    </div>
+    <div class="panel">
+      <div class="panel-title">Daily Return Distribution (Portfolio)</div>
+      <div class="chart-wrap"><canvas id="histChart" height="200"></canvas></div>
+    </div>
+  </div>
+
+  <!-- Row 2: Rolling volatility + Correlation heatmap + Weights -->
+  <div class="charts-row3">
+    <div class="panel">
+      <div class="panel-title">Volatility Comparison (Ann.)</div>
+      <div class="chart-wrap"><canvas id="volBar" height="200"></canvas></div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-title">Correlation Heatmap</div>
+      <div class="chart-wrap">
+        <canvas id="heatmap-canvas" height="260"></canvas>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-title">Portfolio Weights</div>
+      <div id="weights-container"></div>
+    </div>
+  </div>
+
+  <!-- Row 3: VaR comparison bar + Sharpe bars -->
+  <div class="charts-grid">
+    <div class="panel">
+      <div class="panel-title">Value at Risk – Historical vs Parametric (95%)</div>
+      <div class="chart-wrap"><canvas id="varChart" height="200"></canvas></div>
+    </div>
+    <div class="panel">
+      <div class="panel-title">Sharpe Ratio by Stock</div>
+      <div class="chart-wrap"><canvas id="sharpeChart" height="200"></canvas></div>
+    </div>
+  </div>
+
+  <!-- Full-width metrics table -->
+  <div class="panel">
+    <div class="panel-title">Individual Stock Risk Metrics</div>
+    <table id="metricsTable">
+      <thead>
+        <tr>
+          <th>Ticker</th>
+          <th>Ann. Return</th>
+          <th>Volatility</th>
+          <th>Sharpe Ratio</th>
+          <th>VaR 95% (Hist)</th>
+          <th>VaR 99% (Hist)</th>
+          <th>CVaR 95%</th>
+          <th>Max Drawdown</th>
+          <th>Skewness</th>
+          <th>Rating</th>
+        </tr>
+      </thead>
+      <tbody id="tableBody"></tbody>
+    </table>
+  </div>
+
+</div>
+
+<!-- ═══════════════════════════ FOOTER ══════════════════════════════════ -->
+<footer>
+  <div><span class="status-dot"></span>LIVE ANALYTICS · DATA SOURCE: SYNTHETIC KAGGLE-STYLE DATASET · 10 STOCKS · 1,042 TRADING DAYS</div>
+  <div>BUILT WITH PYTHON · PANDAS · NUMPY · SCIPY · Chart.js</div>
+</footer>
+
+<script>
+// ─── EMBEDDED DATA (generated by risk_analysis.py) ───────────────────────────
+const INDIVIDUAL = [
+  {"Ticker":"AAPL","Ann_Return_%":25.27,"Ann_Volatility_%":27.98,"Sharpe_Ratio":0.7246,"VaR_95_Hist_%":2.6964,"VaR_99_Hist_%":3.6962,"VaR_95_Param_%":2.7988,"VaR_99_Param_%":3.9999,"CVaR_95_%":3.3875,"Max_Drawdown_%":-38.7,"Skewness":0.1117},
+  {"Ticker":"MSFT","Ann_Return_%":4.18,"Ann_Volatility_%":25.13,"Sharpe_Ratio":-0.0326,"VaR_95_Hist_%":2.5604,"VaR_99_Hist_%":3.5381,"VaR_95_Param_%":2.5877,"VaR_99_Param_%":3.6667,"CVaR_95_%":3.2987,"Max_Drawdown_%":-40.08,"Skewness":0.0125},
+  {"Ticker":"GOOGL","Ann_Return_%":-4.51,"Ann_Volatility_%":26.21,"Sharpe_Ratio":-0.363,"VaR_95_Hist_%":2.7067,"VaR_99_Hist_%":3.6725,"VaR_95_Param_%":2.7338,"VaR_99_Param_%":3.859,"CVaR_95_%":3.381,"Max_Drawdown_%":-45.65,"Skewness":-0.0575},
+  {"Ticker":"AMZN","Ann_Return_%":21.59,"Ann_Volatility_%":29.75,"Sharpe_Ratio":0.5576,"VaR_95_Hist_%":2.8416,"VaR_99_Hist_%":4.2157,"VaR_95_Param_%":2.9967,"VaR_99_Param_%":4.2738,"CVaR_95_%":3.7017,"Max_Drawdown_%":-25.02,"Skewness":0.0991},
+  {"Ticker":"TSLA","Ann_Return_%":28.05,"Ann_Volatility_%":62.59,"Sharpe_Ratio":0.3683,"VaR_95_Hist_%":6.3525,"VaR_99_Hist_%":8.5261,"VaR_95_Param_%":6.3744,"VaR_99_Param_%":9.0616,"CVaR_95_%":7.8506,"Max_Drawdown_%":-72.71,"Skewness":0.0748},
+  {"Ticker":"JPM","Ann_Return_%":4.78,"Ann_Volatility_%":21.63,"Sharpe_Ratio":-0.01,"VaR_95_Hist_%":2.155,"VaR_99_Hist_%":3.0687,"VaR_95_Param_%":2.2221,"VaR_99_Param_%":3.1507,"CVaR_95_%":2.7222,"Max_Drawdown_%":-43.66,"Skewness":0.0184},
+  {"Ticker":"BAC","Ann_Return_%":7.0,"Ann_Volatility_%":24.55,"Sharpe_Ratio":0.0814,"VaR_95_Hist_%":2.4877,"VaR_99_Hist_%":3.4633,"VaR_95_Param_%":2.5163,"VaR_99_Param_%":3.5704,"CVaR_95_%":3.1206,"Max_Drawdown_%":-36.38,"Skewness":0.0108},
+  {"Ticker":"JNJ","Ann_Return_%":-5.9,"Ann_Volatility_%":16.67,"Sharpe_Ratio":-0.6538,"VaR_95_Hist_%":1.6903,"VaR_99_Hist_%":2.3982,"VaR_95_Param_%":1.7508,"VaR_99_Param_%":2.4665,"CVaR_95_%":2.1432,"Max_Drawdown_%":-47.94,"Skewness":0.0922},
+  {"Ticker":"XOM","Ann_Return_%":16.42,"Ann_Volatility_%":27.53,"Sharpe_Ratio":0.4149,"VaR_95_Hist_%":2.8657,"VaR_99_Hist_%":3.8928,"VaR_95_Param_%":2.7876,"VaR_99_Param_%":3.9695,"CVaR_95_%":3.5087,"Max_Drawdown_%":-38.86,"Skewness":0.0032},
+  {"Ticker":"GLD","Ann_Return_%":0.53,"Ann_Volatility_%":12.9,"Sharpe_Ratio":-0.3466,"VaR_95_Hist_%":1.3297,"VaR_99_Hist_%":1.8124,"VaR_95_Param_%":1.3348,"VaR_99_Param_%":1.8887,"CVaR_95_%":1.6479,"Max_Drawdown_%":-20.93,"Skewness":-0.0119}
+];
+
+const WEIGHTS = {AAPL:0.20,MSFT:0.15,GOOGL:0.10,AMZN:0.10,TSLA:0.10,JPM:0.10,BAC:0.05,JNJ:0.10,XOM:0.05,GLD:0.05};
+
+const CORR = {
+  AAPL: {AAPL:1.000,MSFT:0.535,GOOGL:0.519,AMZN:0.503,TSLA:0.271,JPM:0.399,BAC:0.362,JNJ:0.162,XOM:0.198,GLD:-0.032},
+  MSFT: {AAPL:0.535,MSFT:1.000,GOOGL:0.524,AMZN:0.485,TSLA:0.258,JPM:0.385,BAC:0.341,JNJ:0.151,XOM:0.178,GLD:-0.024},
+  GOOGL:{AAPL:0.519,MSFT:0.524,GOOGL:1.000,AMZN:0.503,TSLA:0.246,JPM:0.374,BAC:0.347,JNJ:0.148,XOM:0.177,GLD:-0.018},
+  AMZN: {AAPL:0.503,MSFT:0.485,GOOGL:0.503,AMZN:1.000,TSLA:0.267,JPM:0.361,BAC:0.318,JNJ:0.141,XOM:0.172,GLD:-0.021},
+  TSLA: {AAPL:0.271,MSFT:0.258,GOOGL:0.246,AMZN:0.267,TSLA:1.000,JPM:0.190,BAC:0.168,JNJ:0.072,XOM:0.093,GLD:-0.010},
+  JPM:  {AAPL:0.399,MSFT:0.385,GOOGL:0.374,AMZN:0.361,TSLA:0.190,JPM:1.000,BAC:0.617,JNJ:0.248,XOM:0.308,GLD:-0.038},
+  BAC:  {AAPL:0.362,MSFT:0.341,GOOGL:0.347,AMZN:0.318,TSLA:0.168,JPM:0.617,BAC:1.000,JNJ:0.221,XOM:0.274,GLD:-0.031},
+  JNJ:  {AAPL:0.162,MSFT:0.151,GOOGL:0.148,AMZN:0.141,TSLA:0.072,JPM:0.248,BAC:0.221,JNJ:1.000,XOM:0.139,GLD:0.002},
+  XOM:  {AAPL:0.198,MSFT:0.178,GOOGL:0.177,AMZN:0.172,TSLA:0.093,JPM:0.308,BAC:0.274,JNJ:0.139,XOM:1.000,GLD:0.018},
+  GLD:  {AAPL:-0.032,MSFT:-0.024,GOOGL:-0.018,AMZN:-0.021,TSLA:-0.010,JPM:-0.038,BAC:-0.031,JNJ:0.002,XOM:0.018,GLD:1.000}
+};
+
+const TICKERS = INDIVIDUAL.map(d => d.Ticker);
+
+// ─── Colour palette ────────────────────────────────────────────────────────────
+const COLORS = [
+  '#00d4ff','#00ff88','#ff6b35','#c084fc','#ffd700',
+  '#ff4560','#546fff','#02e2ac','#ff9f40','#e040fb'
+];
+
+// ─── Ticker tape ──────────────────────────────────────────────────────────────
+const scroll = document.getElementById('ticker-scroll');
+const tickerData = INDIVIDUAL.map(d => ({
+  sym: d.Ticker,
+  ret: d['Ann_Return_%'],
+  vol: d['Ann_Volatility_%']
+}));
+const tickerHTML = [...tickerData, ...tickerData].map(t =>
+  `<span class="ticker-item">
+     <span class="sym">${t.sym}</span>
+     <span class="chg" style="color:${t.ret>=0?'#00ff88':'#ff4560'}">${t.ret>=0?'+':''}${t.ret}%</span>
+     <span style="color:#5a7a96">Vol:${t.vol}%</span>
+   </span>`
+).join('');
+scroll.innerHTML = tickerHTML;
+
+// ─── Chart defaults ──────────────────────────────────────────────────────────
+Chart.defaults.color = '#5a7a96';
+Chart.defaults.borderColor = '#1e2d40';
+Chart.defaults.font.family = "'IBM Plex Mono', monospace";
+Chart.defaults.font.size = 11;
+
+const grid = { color: 'rgba(30,45,64,0.8)', drawBorder: false };
+const noLegend = { display: false };
+
+// ─── 1. Risk-Return Scatter ──────────────────────────────────────────────────
+new Chart(document.getElementById('scatterChart'), {
+  type: 'scatter',
+  data: {
+    datasets: INDIVIDUAL.map((d, i) => ({
+      label: d.Ticker,
+      data: [{ x: d['Ann_Volatility_%'], y: d['Ann_Return_%'] }],
+      backgroundColor: COLORS[i] + 'cc',
+      borderColor: COLORS[i],
+      pointRadius: 8,
+      pointHoverRadius: 11,
+    }))
+  },
+  options: {
+    responsive: true,
+    plugins: {
+      legend: { display: true, position: 'right', labels: { boxWidth: 10, padding: 12, font: {size:10} } },
+      tooltip: {
+        callbacks: {
+          label: ctx => `${ctx.dataset.label}: Risk=${ctx.parsed.x}% | Return=${ctx.parsed.y}%`
+        }
+      }
+    },
+    scales: {
+      x: { title: { display: true, text: 'Annualised Volatility (%)', color:'#5a7a96' }, grid },
+      y: { title: { display: true, text: 'Annualised Return (%)', color:'#5a7a96' },
+           grid,
+           ticks: { callback: v => v+'%' }
+         }
+    }
+  }
+});
+
+// ─── 2. Return Distribution Histogram ────────────────────────────────────────
+(function() {
+  // Simulate portfolio daily returns using individual returns × weights
+  const bins = 50;
+  const mu = 11.28 / 252 / 100;
+  const sigma = 10.80 / 252 / 100 * Math.sqrt(252);
+  // Generate normal distribution curve data
+  const xs = [], ys = [];
+  const lo = -0.035, hi = 0.035, step = (hi - lo) / bins;
+  for (let i = 0; i <= bins; i++) {
+    const x = lo + i * step;
+    xs.push((x * 100).toFixed(2) + '%');
+    // Gaussian PDF
+    const pdf = (1 / (sigma * Math.sqrt(2 * Math.PI))) * Math.exp(-0.5 * ((x - mu) / sigma) ** 2);
+    ys.push(+(pdf * step * 100).toFixed(4));
+  }
+
+  // Simulate histogram bars
+  const barData = ys.map((v, i) => {
+    const xVal = lo + i * step;
+    return { x: xs[i], y: v, neg: xVal < 0 };
+  });
+
+  new Chart(document.getElementById('histChart'), {
+    type: 'bar',
+    data: {
+      labels: xs,
+      datasets: [{
+        label: 'Frequency',
+        data: ys,
+        backgroundColor: ys.map((_, i) => (lo + i*step < 0) ? '#ff456099' : '#00d4ff66'),
+        borderColor: ys.map((_, i) => (lo + i*step < 0) ? '#ff4560' : '#00d4ff'),
+        borderWidth: 1,
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        legend: noLegend,
+        tooltip: { callbacks: { label: c => `Density: ${c.parsed.y.toFixed(4)}` } }
+      },
+      scales: {
+        x: { ticks: { maxTicksLimit: 10 }, grid },
+        y: { grid, title: { display: true, text: 'Probability Density', color:'#5a7a96' } }
+      }
+    }
+  });
+})();
+
+// ─── 3. Volatility Bar Chart ─────────────────────────────────────────────────
+const sortedVol = [...INDIVIDUAL].sort((a,b) => b['Ann_Volatility_%'] - a['Ann_Volatility_%']);
+new Chart(document.getElementById('volBar'), {
+  type: 'bar',
+  data: {
+    labels: sortedVol.map(d => d.Ticker),
+    datasets: [{
+      label: 'Volatility %',
+      data: sortedVol.map(d => d['Ann_Volatility_%']),
+      backgroundColor: sortedVol.map(d =>
+        d['Ann_Volatility_%'] > 40 ? '#ff456099' :
+        d['Ann_Volatility_%'] > 25 ? '#ffd70088' : '#00d4ff77'
+      ),
+      borderColor: sortedVol.map(d =>
+        d['Ann_Volatility_%'] > 40 ? '#ff4560' :
+        d['Ann_Volatility_%'] > 25 ? '#ffd700' : '#00d4ff'
+      ),
+      borderWidth: 1.5,
+      borderRadius: 3,
+    }]
+  },
+  options: {
+    indexAxis: 'y',
+    responsive: true,
+    plugins: { legend: noLegend },
+    scales: {
+      x: { grid, ticks: { callback: v => v+'%' } },
+      y: { grid: { display: false } }
+    }
+  }
+});
+
+// ─── 4. Correlation Heatmap (Canvas) ────────────────────────────────────────
+(function() {
+  const canvas = document.getElementById('heatmap-canvas');
+  const ctx = canvas.getContext('2d');
+  const labels = TICKERS;
+  const n = labels.length;
+
+  function colorForCorr(v) {
+    if (v >= 0) {
+      const t = v;
+      const r = Math.round(0   + t * 0);
+      const g = Math.round(212 * t);
+      const b = Math.round(255 * t);
+      return `rgba(${r},${g},${b},${0.15 + t*0.75})`;
+    } else {
+      const t = -v;
+      return `rgba(255,${Math.round(69*(1-t))},${Math.round(96*(1-t))},${0.15 + t*0.75})`;
+    }
+  }
+
+  function draw() {
+    const W = canvas.parentElement.clientWidth - 40;
+    const H = 280;
+    canvas.width = W; canvas.height = H;
+    ctx.clearRect(0,0,W,H);
+
+    const pad = 42;
+    const cw = (W - pad) / n;
+    const ch = (H - pad) / n;
+
+    ctx.fillStyle = '#5a7a96';
+    ctx.font = '10px IBM Plex Mono';
+    ctx.textAlign = 'right';
+    labels.forEach((l, i) => {
+      ctx.fillText(l, pad - 5, pad + i * ch + ch/2 + 4);
+    });
+    ctx.textAlign = 'center';
+    labels.forEach((l, j) => {
+      ctx.save();
+      ctx.translate(pad + j * cw + cw/2, pad - 5);
+      ctx.rotate(-Math.PI / 4);
+      ctx.fillText(l, 0, 0);
+      ctx.restore();
+    });
+
+    labels.forEach((row, i) => {
+      labels.forEach((col, j) => {
+        const v = CORR[row][col];
+        ctx.fillStyle = colorForCorr(v);
+        ctx.fillRect(pad + j*cw, pad + i*ch, cw-1, ch-1);
+        ctx.fillStyle = Math.abs(v) > 0.5 ? '#fff' : '#5a7a96';
+        ctx.font = '9px IBM Plex Mono';
+        ctx.textAlign = 'center';
+        ctx.fillText(v.toFixed(2), pad + j*cw + cw/2, pad + i*ch + ch/2 + 3);
+      });
+    });
+  }
+
+  draw();
+  window.addEventListener('resize', draw);
+})();
+
+// ─── 5. Portfolio weights bars ────────────────────────────────────────────────
+const wc = document.getElementById('weights-container');
+const sortedW = Object.entries(WEIGHTS).sort((a,b) => b[1]-a[1]);
+wc.innerHTML = sortedW.map(([t, w], i) => `
+  <div class="weight-row">
+    <div class="weight-label" style="color:${COLORS[i]}">${t}</div>
+    <div class="weight-track"><div class="weight-fill" style="width:${w*100}%;background:${COLORS[i]}"></div></div>
+    <div class="weight-pct">${(w*100).toFixed(0)}%</div>
+  </div>
+`).join('');
+
+// ─── 6. VaR Comparison Chart ─────────────────────────────────────────────────
+new Chart(document.getElementById('varChart'), {
+  type: 'bar',
+  data: {
+    labels: TICKERS,
+    datasets: [
+      {
+        label: 'VaR 95% Historical',
+        data: INDIVIDUAL.map(d => d['VaR_95_Hist_%']),
+        backgroundColor: '#00d4ff55',
+        borderColor: '#00d4ff',
+        borderWidth: 1.5,
+        borderRadius: 3,
+      },
+      {
+        label: 'VaR 95% Parametric',
+        data: INDIVIDUAL.map(d => d['VaR_95_Param_%']),
+        backgroundColor: '#ffd70055',
+        borderColor: '#ffd700',
+        borderWidth: 1.5,
+        borderRadius: 3,
+      },
+      {
+        label: 'CVaR 95%',
+        data: INDIVIDUAL.map(d => d['CVaR_95_%']),
+        backgroundColor: '#ff456055',
+        borderColor: '#ff4560',
+        borderWidth: 1.5,
+        borderRadius: 3,
+      }
+    ]
+  },
+  options: {
+    responsive: true,
+    plugins: {
+      legend: { display: true, position: 'top', labels: { boxWidth: 10, padding: 14, font:{size:10} } },
+      tooltip: { callbacks: { label: c => `${c.dataset.label}: ${c.parsed.y}%` } }
+    },
+    scales: {
+      x: { grid: { display: false } },
+      y: { grid, ticks: { callback: v => v+'%' }, title: { display: true, text: 'Daily Loss (%)', color:'#5a7a96' } }
+    }
+  }
+});
+
+// ─── 7. Sharpe Ratio Bar Chart ─────────────────────────────────────────────────
+const sortedS = [...INDIVIDUAL].sort((a,b) => b.Sharpe_Ratio - a.Sharpe_Ratio);
+new Chart(document.getElementById('sharpeChart'), {
+  type: 'bar',
+  data: {
+    labels: sortedS.map(d => d.Ticker),
+    datasets: [{
+      label: 'Sharpe Ratio',
+      data: sortedS.map(d => d.Sharpe_Ratio),
+      backgroundColor: sortedS.map(d =>
+        d.Sharpe_Ratio > 0.5 ? '#00ff8888' :
+        d.Sharpe_Ratio > 0   ? '#00d4ff66' : '#ff456077'
+      ),
+      borderColor: sortedS.map(d =>
+        d.Sharpe_Ratio > 0.5 ? '#00ff88' :
+        d.Sharpe_Ratio > 0   ? '#00d4ff' : '#ff4560'
+      ),
+      borderWidth: 1.5,
+      borderRadius: 3,
+    }]
+  },
+  options: {
+    responsive: true,
+    plugins: { legend: noLegend },
+    scales: {
+      x: { grid: { display: false } },
+      y: {
+        grid,
+        ticks: { callback: v => v.toFixed(1) },
+        title: { display: true, text: 'Sharpe Ratio', color:'#5a7a96' }
+      }
+    }
+  }
+});
+
+// ─── 8. Metrics Table ─────────────────────────────────────────────────────────
+function getRating(d) {
+  if (d.Sharpe_Ratio > 0.5 && d['Max_Drawdown_%'] > -40)
+    return '<span class="badge good">STRONG</span>';
+  if (d.Sharpe_Ratio < 0)
+    return '<span class="badge bad">WEAK</span>';
+  return '<span class="badge ok">NEUTRAL</span>';
+}
+
+const tbody = document.getElementById('tableBody');
+INDIVIDUAL.forEach((d, i) => {
+  const tr = document.createElement('tr');
+  tr.innerHTML = `
+    <td><span class="ticker-badge"><span class="ticker-dot" style="background:${COLORS[i]}"></span>${d.Ticker}</span></td>
+    <td style="color:${d['Ann_Return_%']>=0?'#00ff88':'#ff4560'}">${d['Ann_Return_%']>=0?'+':''}${d['Ann_Return_%']}%</td>
+    <td style="color:${d['Ann_Volatility_%']>35?'#ff4560':d['Ann_Volatility_%']>25?'#ffd700':'#00d4ff'}">${d['Ann_Volatility_%']}%</td>
+    <td style="color:${d.Sharpe_Ratio>0.5?'#00ff88':d.Sharpe_Ratio>0?'#00d4ff':'#ff4560'}">${d.Sharpe_Ratio}</td>
+    <td>${d['VaR_95_Hist_%']}%</td>
+    <td>${d['VaR_99_Hist_%']}%</td>
+    <td>${d['CVaR_95_%']}%</td>
+    <td style="color:#ff4560">${d['Max_Drawdown_%']}%</td>
+    <td style="color:${d.Skewness>=0?'#00d4ff':'#ff4560'}">${d.Skewness}</td>
+    <td>${getRating(d)}</td>
+  `;
+  tbody.appendChild(tr);
+});
+</script>
+</body>
+</html>
